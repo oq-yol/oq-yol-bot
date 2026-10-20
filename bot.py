@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
-TOKEN = "8856474842:AAGDUx4Yfz5LmjsmqR9U07aKXZZnbl5qDiM"  # ← замените
+TOKEN = os.getenv("TOKEN")  # ← замените
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
