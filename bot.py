@@ -128,7 +128,7 @@ def regions_kb(lang="ru"):
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
 
-def save_driver(data: dict):
+def save_driver(data: dict, docs_link: str = ""):
     file_exists = os.path.isfile("drivers.csv")
     with open("drivers.csv", "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=data.keys())
@@ -148,7 +148,8 @@ def save_driver(data: dict):
                 data.get("yatt", ""),
                 data.get("regions", ""),
                 f"@{data.get('username', '')}" if data.get("username") else "",
-                "Новый"
+                "Новый",
+                docs_link
             ]
             sheet.append_row(row)
             logger.info("Запись добавлена в Google Sheets")
@@ -485,16 +486,8 @@ async def show_summary(message: types.Message, state: FSMContext):
 @dp.message(Reg.confirm, F.text.lower().in_(["да", "ha", "yes"]))
 async def confirm_reg(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    save_driver(data)
     
-    lang = data.get("lang", "ru")
-    text = {
-        "ru": "✅ Регистрация принята!\n\nМенеджер свяжется с вами в течение 24 часов.\nТеперь вам доступны актуальные грузы.",
-        "uz": "✅ Ro‘yxatdan o‘tish qabul qilindi!\n\nMenejer 24 soat ichida bog‘lanadi.\nEndi joriy yuklar sizga ochiq."
-    }[lang]
-    await state.update_data(registered=True)
-    await message.answer(text, reply_markup=main_kb(lang, registered=True))
-    
+    docs_link = ""
     try:
         text_admin = (
             f"🚛 Новый водитель!\n\n"
@@ -506,8 +499,10 @@ async def confirm_reg(message: types.Message, state: FSMContext):
             f"Регионы: {data.get('regions')}\n"
             f"Username: @{data.get('username', '')}"
         )
+        sent = await bot.send_message(CHANNEL_ID, text_admin)
+        docs_link = f"https://t.me/c/{str(CHANNEL_ID)[4:]}/{sent.message_id}"
+
         await bot.send_message(ADMIN_ID, text_admin)
-        await bot.send_message(CHANNEL_ID, text_admin)
 
         docs = [
             ("truck_photo_front", "Техпаспорт лицевая"),
@@ -527,7 +522,16 @@ async def confirm_reg(message: types.Message, state: FSMContext):
                     await bot.send_photo(ADMIN_ID, data[key], caption=full_caption)
     except Exception as e:
         logger.error(f"Не удалось отправить уведомление: {e}")
+
+    save_driver(data, docs_link)
     
+    lang = data.get("lang", "ru")
+    text = {
+        "ru": "✅ Регистрация принята!\n\nМенеджер свяжется с вами в течение 24 часов.\nТеперь вам доступны актуальные грузы.",
+        "uz": "✅ Ro‘yxatdan o‘tish qabul qilindi!\n\nMenejer 24 soat ichida bog‘lanadi.\nEndi joriy yuklar sizga ochiq."
+    }[lang]
+    await state.update_data(registered=True)
+    await message.answer(text, reply_markup=main_kb(lang, registered=True))
     await state.clear()
 
 @dp.message(F.text.in_(["📦 Актуальные грузы", "📦 Joriy yuklar"]))
