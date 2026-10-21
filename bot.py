@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 TOKEN = os.getenv("TOKEN")
@@ -24,9 +24,10 @@ class Reg(StatesGroup):
     name = State()
     phone = State()
     truck = State()
-    truck_photo = State()
-    license_photo = State()
-    plate = State()
+    truck_photo_front = State()
+    truck_photo_back = State()
+    license_photo_front = State()
+    license_photo_back = State()
     yatt = State()
     regions = State()
     confirm = State()
@@ -56,7 +57,7 @@ def main_kb(lang="ru", registered=False):
 def yatt_kb(lang="ru"):
     kb = ReplyKeyboardBuilder()
     if lang == "ru":
-        kb.button(text="Да, есть ЯТТ")
+        kb.button(text="Да, есть ИП")
         kb.button(text="Нет, нужно открыть")
         kb.button(text="В процессе")
     else:
@@ -67,13 +68,15 @@ def yatt_kb(lang="ru"):
     return kb.as_markup(resize_keyboard=True)
 
 REGIONS = [
-    "Ташкент", "Самарканд", "Бухара", "Навои", "Фергана",
-    "Андижан", "Наманган", "Карши", "Термез", "Нукус",
-    "Ургенч", "Джизак", "Гулистан", "Чирчик", "Алмалык"
+    "Андижанская область", "Бухарская область", "Джизакская область",
+    "Кашкадарьинская область", "Навоийская область", "Наманганская область",
+    "Самаркандская область", "Сурхандарьинская область", "Сырдарьинская область",
+    "Ташкентская область", "Ферганская область", "Хорезмская область"
 ]
 
 def regions_kb():
     kb = ReplyKeyboardBuilder()
+    kb.button(text="✅ Все регионы")
     for r in REGIONS:
         kb.button(text=r)
     kb.button(text="✅ Готово")
@@ -94,7 +97,7 @@ async def start(message: types.Message, state: FSMContext):
     await message.answer(
         "Assalomu alaykum! / Здравствуйте!\n\n"
         "OQ YOL — doimiy yuklar tent mashinalar uchun.\n"
-        "Постоянные грузы для тентов по всему Узбекистану.\n\n"
+        "Постоянные грузы для большегрузных машин по всему Узбекистану.\n\n"
         "Выберите язык / Tilni tanlang:",
         reply_markup=lang_kb()
     )
@@ -104,10 +107,10 @@ async def start(message: types.Message, state: FSMContext):
 async def set_lang(message: types.Message, state: FSMContext):
     lang = "ru" if "Русский" in message.text else "uz"
     await state.update_data(lang=lang, registered=False)
-    text = {
-        "ru": "Отлично! Нажмите «Зарегистрироваться», чтобы начать.",
-        "uz": "Ajoyib! Ro‘yxatdan o‘tish uchun tugmani bosing."
-    }[lang]
+    if lang == "ru":
+        text = "Отлично! Нажмите «Зарегистрироваться», чтобы начать."
+    else:
+        text = "Ajoyib! Ro‘yxatdan o‘tish uchun tugmani bosing."
     await message.answer(text, reply_markup=main_kb(lang, registered=False))
     await state.set_state(None)
 
@@ -133,8 +136,8 @@ async def get_phone(message: types.Message, state: FSMContext):
     await state.update_data(phone=message.text)
     data = await state.get_data()
     lang = data.get("lang", "ru")
-    text = {"ru": "Опишите машину (тент, объём м³, грузоподъёмность тонн):",
-            "uz": "Mashinani tasvirlab bering (tent, hajm m³, yuk ko‘tarish qobiliyati):"}[lang]
+    text = {"ru": "Опишите машину (тент / большегруз, объём м³, грузоподъёмность тонн):",
+            "uz": "Mashinani tasvirlab bering (tent / og‘ir yuk, hajm m³, yuk ko‘tarish qobiliyati):"}[lang]
     await message.answer(text)
     await state.set_state(Reg.truck)
 
@@ -146,35 +149,44 @@ async def get_truck(message: types.Message, state: FSMContext):
     text = {"ru": "Отправьте фото техпаспорта (лицевая сторона):",
             "uz": "Texnik pasport fotosini yuboring (old tomoni):"}[lang]
     await message.answer(text)
-    await state.set_state(Reg.truck_photo)
+    await state.set_state(Reg.truck_photo_front)
 
-@dp.message(Reg.truck_photo, F.photo)
-async def get_truck_photo(message: types.Message, state: FSMContext):
-    photo_id = message.photo[-1].file_id
-    await state.update_data(truck_photo=photo_id)
+@dp.message(Reg.truck_photo_front, F.photo)
+async def get_truck_photo_front(message: types.Message, state: FSMContext):
+    await state.update_data(truck_photo_front=message.photo[-1].file_id)
     data = await state.get_data()
     lang = data.get("lang", "ru")
-    text = {"ru": "Теперь отправьте фото водительских прав:",
-            "uz": "Endi haydovchilik guvohnomasi fotosini yuboring:"}[lang]
+    text = {"ru": "Отправьте фото техпаспорта (задняя сторона):",
+            "uz": "Texnik pasport fotosini yuboring (orqa tomoni):"}[lang]
     await message.answer(text)
-    await state.set_state(Reg.license_photo)
+    await state.set_state(Reg.truck_photo_back)
 
-@dp.message(Reg.license_photo, F.photo)
-async def get_license_photo(message: types.Message, state: FSMContext):
-    photo_id = message.photo[-1].file_id
-    await state.update_data(license_photo=photo_id)
+@dp.message(Reg.truck_photo_back, F.photo)
+async def get_truck_photo_back(message: types.Message, state: FSMContext):
+    await state.update_data(truck_photo_back=message.photo[-1].file_id)
     data = await state.get_data()
     lang = data.get("lang", "ru")
-    text = {"ru": "Государственный номер автомобиля:", "uz": "Davlat raqami:"}[lang]
+    text = {"ru": "Отправьте фото водительских прав (лицевая сторона):",
+            "uz": "Haydovchilik guvohnomasi fotosini yuboring (old tomoni):"}[lang]
     await message.answer(text)
-    await state.set_state(Reg.plate)
+    await state.set_state(Reg.license_photo_front)
 
-@dp.message(Reg.plate)
-async def get_plate(message: types.Message, state: FSMContext):
-    await state.update_data(plate=message.text)
+@dp.message(Reg.license_photo_front, F.photo)
+async def get_license_photo_front(message: types.Message, state: FSMContext):
+    await state.update_data(license_photo_front=message.photo[-1].file_id)
     data = await state.get_data()
     lang = data.get("lang", "ru")
-    text = {"ru": "Есть ли у вас ЯТТ?", "uz": "YaTT bormi?"}[lang]
+    text = {"ru": "Отправьте фото водительских прав (задняя сторона):",
+            "uz": "Haydovchilik guvohnomasi fotosini yuboring (orqa tomoni):"}[lang]
+    await message.answer(text)
+    await state.set_state(Reg.license_photo_back)
+
+@dp.message(Reg.license_photo_back, F.photo)
+async def get_license_photo_back(message: types.Message, state: FSMContext):
+    await state.update_data(license_photo_back=message.photo[-1].file_id)
+    data = await state.get_data()
+    lang = data.get("lang", "ru")
+    text = {"ru": "Есть ли у вас ИП?", "uz": "YaTT bormi?"}[lang]
     await message.answer(text, reply_markup=yatt_kb(lang))
     await state.set_state(Reg.yatt)
 
@@ -183,8 +195,36 @@ async def get_yatt(message: types.Message, state: FSMContext):
     await state.update_data(yatt=message.text, selected_regions=[])
     data = await state.get_data()
     lang = data.get("lang", "ru")
-    text = {"ru": "Выберите регионы, в которых готовы работать (можно несколько). Когда закончите — нажмите «✅ Готово»",
-            "uz": "Ishlamoqchi bo‘lgan hududlarni tanlang (bir nechtasini tanlash mumkin). Tugatgach «✅ Tayyor» tugmasini bosing"}[lang]
+
+    if "Нет" in message.text or "Yo‘q" in message.text:
+        if lang == "ru":
+            guide = (
+                "Пошаговый план открытия ИП онлайн:\n\n"
+                "1. Получите ЭЦП (электронную подпись) на e-imzo.uz или в Центре госуслуг.\n"
+                "2. Зайдите на my.gov.uz или new.birdarcha.uz.\n"
+                "3. Выберите услугу «Регистрация индивидуального предпринимателя».\n"
+                "4. Заполните данные (ПИНФЛ, адрес, вид деятельности, налоговый режим).\n"
+                "5. Подпишите заявление ЭЦП и оплатите госпошлину (онлайн дешевле).\n"
+                "6. Получите подтверждение (обычно до 30 минут).\n\n"
+                "После этого можно продолжить регистрацию в боте."
+            )
+        else:
+            guide = (
+                "YaTTni onlayn ochish bo‘yicha qisqa reja:\n\n"
+                "1. ERI (elektron imzo) oling — e-imzo.uz yoki DXM.\n"
+                "2. my.gov.uz yoki new.birdarcha.uz ga kiring.\n"
+                "3. «Yakka tartibdagi tadbirkorni ro‘yxatdan o‘tkazish» xizmatini tanlang.\n"
+                "4. Ma’lumotlarni to‘ldiring (JShShIR, manzil, faoliyat turi).\n"
+                "5. ERI bilan imzolang va boj to‘lang (onlayn arzonroq).\n"
+                "6. Tasdiq oling (odatda 30 daqiqagacha).\n\n"
+                "Keyin botda ro‘yxatdan o‘tishni davom ettiring."
+            )
+        await message.answer(guide)
+
+    text = {
+        "ru": "Выберите регионы, в которых готовы работать (можно несколько или все сразу). Когда закончите — нажмите «✅ Готово»",
+        "uz": "Ishlamoqchi bo‘lgan hududlarni tanlang (bir nechtasini yoki hammasini). Tugatgach «✅ Tayyor» tugmasini bosing"
+    }[lang]
     await message.answer(text, reply_markup=regions_kb())
     await state.set_state(Reg.regions)
 
@@ -199,8 +239,13 @@ async def get_regions(message: types.Message, state: FSMContext):
             await message.answer("Выберите хотя бы один регион.")
             return
         await state.update_data(regions=", ".join(selected))
-        # Переход к подтверждению
         await show_summary(message, state)
+        return
+
+    if message.text == "✅ Все регионы":
+        selected = REGIONS.copy()
+        await state.update_data(selected_regions=selected)
+        await message.answer(f"Выбраны все регионы.\nНажмите «✅ Готово» для продолжения.")
         return
 
     if message.text in REGIONS:
@@ -211,7 +256,7 @@ async def get_regions(message: types.Message, state: FSMContext):
         else:
             await message.answer("Этот регион уже выбран.")
     else:
-        await message.answer("Выберите регион из списка или нажмите «✅ Готово».")
+        await message.answer("Выберите регион из списка, «✅ Все регионы» или «✅ Готово».")
 
 async def show_summary(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -222,8 +267,7 @@ async def show_summary(message: types.Message, state: FSMContext):
                    f"ФИО: {data['name']}\n"
                    f"Телефон: {data['phone']}\n"
                    f"Машина: {data['truck']}\n"
-                   f"Номер: {data['plate']}\n"
-                   f"ЯТТ: {data['yatt']}\n"
+                   f"ИП: {data['yatt']}\n"
                    f"Регионы: {data['regions']}\n\n"
                    f"Всё верно? Напишите «Да» или «Нет»")
     else:
@@ -231,7 +275,6 @@ async def show_summary(message: types.Message, state: FSMContext):
                    f"F.I.Sh: {data['name']}\n"
                    f"Telefon: {data['phone']}\n"
                    f"Mashina: {data['truck']}\n"
-                   f"Raqam: {data['plate']}\n"
                    f"YaTT: {data['yatt']}\n"
                    f"Hududlar: {data['regions']}\n\n"
                    f"Hammasi to‘g‘rimi? «Ha» yoki «Yo‘q» deb yozing")
@@ -258,21 +301,23 @@ async def confirm_reg(message: types.Message, state: FSMContext):
             f"ФИО: {data.get('name')}\n"
             f"Телефон: {data.get('phone')}\n"
             f"Машина: {data.get('truck')}\n"
-            f"Номер: {data.get('plate')}\n"
-            f"ЯТТ: {data.get('yatt')}\n"
+            f"ИП/YaTT: {data.get('yatt')}\n"
             f"Регионы: {data.get('regions')}\n"
             f"Username: @{data.get('username', '')}"
         )
         await bot.send_message(ADMIN_ID, text_admin)
-        if data.get("truck_photo"):
-            await bot.send_photo(ADMIN_ID, data["truck_photo"], caption="Техпаспорт")
-        if data.get("license_photo"):
-            await bot.send_photo(ADMIN_ID, data["license_photo"], caption="Права")
+        for key, caption in [
+            ("truck_photo_front", "Техпаспорт лицевая"),
+            ("truck_photo_back", "Техпаспорт задняя"),
+            ("license_photo_front", "Права лицевая"),
+            ("license_photo_back", "Права задняя"),
+        ]:
+            if data.get(key):
+                await bot.send_photo(ADMIN_ID, data[key], caption=caption)
     except Exception as e:
         logger.error(f"Не удалось отправить уведомление: {e}")
     
     await state.clear()
-    logger.info(f"Новый водитель: {data.get('name')} - {data.get('phone')}")
 
 @dp.message(F.text.in_(["📦 Актуальные грузы", "📦 Joriy yuklar"]))
 async def show_loads(message: types.Message, state: FSMContext):
@@ -292,10 +337,11 @@ async def help_cmd(message: types.Message, state: FSMContext):
             "1. Нажмите «Зарегистрироваться»\n"
             "2. Введите ФИО и телефон\n"
             "3. Опишите машину\n"
-            "4. Отправьте фото техпаспорта и прав\n"
-            "5. Укажите номер авто и наличие ЯТТ\n"
-            "6. Выберите регионы работы\n"
-            "7. Подтвердите данные\n\n"
+            "4. Отправьте фото техпаспорта (лицевая и задняя)\n"
+            "5. Отправьте фото прав (лицевая и задняя)\n"
+            "6. Укажите наличие ИП\n"
+            "7. Выберите регионы работы\n"
+            "8. Подтвердите данные\n\n"
             "После регистрации откроется доступ к грузам."
         )
     else:
@@ -304,10 +350,11 @@ async def help_cmd(message: types.Message, state: FSMContext):
             "1. «Ro‘yxatdan o‘tish» tugmasini bosing\n"
             "2. F.I.Sh. va telefonni kiriting\n"
             "3. Mashinani tasvirlang\n"
-            "4. Texpasport va guvohnoma fotosini yuboring\n"
-            "5. Avto raqami va YaTT ni ko‘rsating\n"
-            "6. Ish hududlarini tanlang\n"
-            "7. Ma’lumotlarni tasdiqlang\n\n"
+            "4. Texpasport fotosini yuboring (old va orqa)\n"
+            "5. Guvohnoma fotosini yuboring (old va orqa)\n"
+            "6. YaTT borligini ko‘rsating\n"
+            "7. Ish hududlarini tanlang\n"
+            "8. Ma’lumotlarni tasdiqlang\n\n"
             "Ro‘yxatdan o‘tgach yuklarga kirish ochiladi."
         )
     await message.answer(text)
