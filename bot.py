@@ -2,6 +2,8 @@ import asyncio
 import csv
 import os
 import logging
+import json
+from datetime import datetime
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
@@ -10,15 +12,35 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
+import gspread
+from google.oauth2.service_account import Credentials
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 841472578
+GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
+
+# Google Sheets
+def get_sheet():
+    try:
+        creds_json = os.getenv("GOOGLE_CREDENTIALS")
+        if not creds_json:
+            logger.error("GOOGLE_CREDENTIALS not set")
+            return None
+        creds_dict = json.loads(creds_json)
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(GOOGLE_SHEET_ID).sheet1
+        return sheet
+    except Exception as e:
+        logger.error(f"Google Sheets error: {e}")
+        return None
 
 class Reg(StatesGroup):
     language = State()
@@ -31,7 +53,7 @@ class Reg(StatesGroup):
     license_photo_front = State()
     license_photo_back = State()
     yatt = State()
-    yatt_doc = State()          # ← новый шаг
+    yatt_doc = State()
     regions = State()
     confirm = State()
 
@@ -107,12 +129,33 @@ def regions_kb(lang="ru"):
     return kb.as_markup(resize_keyboard=True)
 
 def save_driver(data: dict):
+    # CSV backup
     file_exists = os.path.isfile("drivers.csv")
     with open("drivers.csv", "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=data.keys())
         if not file_exists:
             writer.writeheader()
         writer.writerow(data)
+
+    # Google Sheets
+    try:
+        sheet = get_sheet()
+        if sheet:
+            row = [
+                datetime.now().strftime("%d.%m.%Y %H:%M"),
+                data.get("name", ""),
+                data.get("phone", ""),
+                data.get("truck_type", ""),
+                data.get("capacity", ""),
+                data.get("yatt", ""),
+                data.get("regions", ""),
+                f"@{data.get('username', '')}" if data.get("username") else "",
+                "Новый"
+            ]
+            sheet.append_row(row)
+            logger.info("Запись добавлена в Google Sheets")
+    except Exception as e:
+        logger.error(f"Ошибка записи в Google Sheets: {e}")
 
 async def health_check(request):
     return web.Response(text="OK")
@@ -142,7 +185,7 @@ async def start(message: types.Message, state: FSMContext):
 @dp.message(Reg.language, F.text.in_(["Русский 🇷🇺", "O‘zbekcha 🇺🇿"]))
 async def set_lang(message: types.Message, state: FSMContext):
     lang = "ru" if "Русский" in message.text else "uz"
-    await state.update_data(lang=lang, registered=False)
+    await state.update_data(lang=lang, registered=False, username=message.from_user.username)
     text = "Отлично! Нажмите «Зарегистрироваться», чтобы начать." if lang == "ru" else "Ajoyib! Ro‘yxatdan o‘tish uchun tugmani bosing."
     await message.answer(text, reply_markup=main_kb(lang, registered=False))
     await state.set_state(None)
@@ -474,7 +517,7 @@ async def confirm_reg(message: types.Message, state: FSMContext):
             ("yatt_doc", "Свидетельство ИП"),
         ]:
             if data.get(key):
-                if key == "yatt_doc" and not str(data[key]).startswith("AgAC"):  # грубая проверка на фото
+                if key == "yatt_doc" and not str(data[key]).startswith("AgAC"):
                     await bot.send_document(ADMIN_ID, data[key], caption=caption)
                 else:
                     await bot.send_photo(ADMIN_ID, data[key], caption=caption)
