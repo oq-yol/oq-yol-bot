@@ -2,6 +2,7 @@ import asyncio
 import csv
 import os
 import logging
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -111,6 +112,20 @@ def save_driver(data: dict):
         if not file_exists:
             writer.writeheader()
         writer.writerow(data)
+
+# === Web server для Render ===
+async def health_check(request):
+    return web.Response(text="OK")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", health_check)
+    port = int(os.environ.get("PORT", 10000))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logger.info(f"Web server started on port {port}")
 
 @dp.message(CommandStart())
 async def start(message: types.Message, state: FSMContext):
@@ -264,8 +279,7 @@ async def get_yatt(message: types.Message, state: FSMContext):
                 "5. Подпишите заявление ЭЦП и оплатите госпошлину (онлайн дешевле).\n"
                 "6. Получите подтверждение (обычно до 30 минут).\n\n"
                 "После этого можно продолжить регистрацию в боте.\n\n"
-                "Если возникнут трудности с открытием ИП — напишите мне лично: @umarov_k\n"
-                "(или просто ответьте здесь «Помощь с ИП»)"
+                "Если возникнут трудности с открытием ИП — напишите мне лично: @ваш_username"
             )
         else:
             guide = (
@@ -277,7 +291,7 @@ async def get_yatt(message: types.Message, state: FSMContext):
                 "5. ERI bilan imzolang va boj to‘lang (onlayn arzonroq).\n"
                 "6. Tasdiq oling (odatda 30 daqiqagacha).\n\n"
                 "Keyin botda ro‘yxatdan o‘tishni davom ettiring.\n\n"
-                "Agar qiyinchiliklar bo‘lsa — menga yozing: @umarov_k"
+                "Agar qiyinchiliklar bo‘lsa — menga yozing: @ваш_username"
             )
         await message.answer(guide)
 
@@ -431,6 +445,7 @@ async def help_cmd(message: types.Message, state: FSMContext):
 
 async def main():
     print("Бот запускается...")
+    await start_web_server()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
