@@ -113,7 +113,6 @@ def save_driver(data: dict):
             writer.writeheader()
         writer.writerow(data)
 
-# === Web server для Render ===
 async def health_check(request):
     return web.Response(text="OK")
 
@@ -218,8 +217,18 @@ async def get_capacity(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=back_kb(lang))
     await state.set_state(Reg.truck_photo_front)
 
-@dp.message(Reg.truck_photo_front, F.photo)
+@dp.message(Reg.truck_photo_front)
 async def get_truck_photo_front(message: types.Message, state: FSMContext):
+    if message.text in ["⬅️ Назад", "⬅️ Orqaga"]:
+        data = await state.get_data()
+        lang = data.get("lang", "ru")
+        text = "Укажите грузоподъёмность в тоннах (например: 20):" if lang == "ru" else "Yuk ko‘tarish qobiliyatini tonnada yozing (masalan: 20):"
+        await message.answer(text, reply_markup=back_kb(lang))
+        await state.set_state(Reg.capacity)
+        return
+    if not message.photo:
+        await message.answer("Пожалуйста, отправьте фото.")
+        return
     await state.update_data(truck_photo_front=message.photo[-1].file_id)
     data = await state.get_data()
     lang = data.get("lang", "ru")
@@ -227,8 +236,18 @@ async def get_truck_photo_front(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=back_kb(lang))
     await state.set_state(Reg.truck_photo_back)
 
-@dp.message(Reg.truck_photo_back, F.photo)
+@dp.message(Reg.truck_photo_back)
 async def get_truck_photo_back(message: types.Message, state: FSMContext):
+    if message.text in ["⬅️ Назад", "⬅️ Orqaga"]:
+        data = await state.get_data()
+        lang = data.get("lang", "ru")
+        text = "Отправьте фото техпаспорта (лицевая сторона):" if lang == "ru" else "Texnik pasport fotosini yuboring (old tomoni):"
+        await message.answer(text, reply_markup=back_kb(lang))
+        await state.set_state(Reg.truck_photo_front)
+        return
+    if not message.photo:
+        await message.answer("Пожалуйста, отправьте фото.")
+        return
     await state.update_data(truck_photo_back=message.photo[-1].file_id)
     data = await state.get_data()
     lang = data.get("lang", "ru")
@@ -236,8 +255,18 @@ async def get_truck_photo_back(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=back_kb(lang))
     await state.set_state(Reg.license_photo_front)
 
-@dp.message(Reg.license_photo_front, F.photo)
+@dp.message(Reg.license_photo_front)
 async def get_license_photo_front(message: types.Message, state: FSMContext):
+    if message.text in ["⬅️ Назад", "⬅️ Orqaga"]:
+        data = await state.get_data()
+        lang = data.get("lang", "ru")
+        text = "Отправьте фото техпаспорта (задняя сторона):" if lang == "ru" else "Texnik pasport fotosini yuboring (orqa tomoni):"
+        await message.answer(text, reply_markup=back_kb(lang))
+        await state.set_state(Reg.truck_photo_back)
+        return
+    if not message.photo:
+        await message.answer("Пожалуйста, отправьте фото.")
+        return
     await state.update_data(license_photo_front=message.photo[-1].file_id)
     data = await state.get_data()
     lang = data.get("lang", "ru")
@@ -245,8 +274,18 @@ async def get_license_photo_front(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=back_kb(lang))
     await state.set_state(Reg.license_photo_back)
 
-@dp.message(Reg.license_photo_back, F.photo)
+@dp.message(Reg.license_photo_back)
 async def get_license_photo_back(message: types.Message, state: FSMContext):
+    if message.text in ["⬅️ Назад", "⬅️ Orqaga"]:
+        data = await state.get_data()
+        lang = data.get("lang", "ru")
+        text = "Отправьте фото водительских прав (лицевая сторона):" if lang == "ru" else "Haydovchilik guvohnomasi fotosini yuboring (old tomoni):"
+        await message.answer(text, reply_markup=back_kb(lang))
+        await state.set_state(Reg.license_photo_front)
+        return
+    if not message.photo:
+        await message.answer("Пожалуйста, отправьте фото.")
+        return
     await state.update_data(license_photo_back=message.photo[-1].file_id)
     data = await state.get_data()
     lang = data.get("lang", "ru")
