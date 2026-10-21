@@ -31,6 +31,7 @@ class Reg(StatesGroup):
     license_photo_front = State()
     license_photo_back = State()
     yatt = State()
+    yatt_doc = State()          # ← новый шаг
     regions = State()
     confirm = State()
 
@@ -303,9 +304,15 @@ async def get_yatt(message: types.Message, state: FSMContext):
         await state.set_state(Reg.license_photo_back)
         return
 
-    await state.update_data(yatt=message.text, selected_regions=[])
+    await state.update_data(yatt=message.text)
     data = await state.get_data()
     lang = data.get("lang", "ru")
+
+    if "Да" in message.text or "Ha" in message.text:
+        text = "Отправьте фото или PDF-файл свидетельства о регистрации ИП:" if lang == "ru" else "YaTT ro‘yxatdan o‘tganligi to‘g‘risidagi guvohnoma fotosini yoki PDF faylini yuboring:"
+        await message.answer(text, reply_markup=back_kb(lang))
+        await state.set_state(Reg.yatt_doc)
+        return
 
     if "Нет" in message.text or "Yo‘q" in message.text:
         if lang == "ru":
@@ -338,14 +345,46 @@ async def get_yatt(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=regions_kb(lang))
     await state.set_state(Reg.regions)
 
-@dp.message(Reg.regions)
-async def get_regions(message: types.Message, state: FSMContext):
+@dp.message(Reg.yatt_doc)
+async def get_yatt_doc(message: types.Message, state: FSMContext):
     if message.text in ["⬅️ Назад", "⬅️ Orqaga"]:
         data = await state.get_data()
         lang = data.get("lang", "ru")
         text = "Есть ли у вас ИП?" if lang == "ru" else "YaTT bormi?"
         await message.answer(text, reply_markup=yatt_kb(lang))
         await state.set_state(Reg.yatt)
+        return
+
+    file_id = None
+    if message.photo:
+        file_id = message.photo[-1].file_id
+    elif message.document:
+        file_id = message.document.file_id
+
+    if not file_id:
+        await message.answer("Пожалуйста, отправьте фото или PDF-файл свидетельства.")
+        return
+
+    await state.update_data(yatt_doc=file_id, selected_regions=[])
+    data = await state.get_data()
+    lang = data.get("lang", "ru")
+    text = "Выберите регионы, в которых готовы работать (можно несколько или все сразу). Когда закончите — нажмите «✅ Готово»" if lang == "ru" else "Ishlamoqchi bo‘lgan hududlarni tanlang (bir nechtasini yoki hammasini). Tugatgach «✅ Tayyor» tugmasini bosing"
+    await message.answer(text, reply_markup=regions_kb(lang))
+    await state.set_state(Reg.regions)
+
+@dp.message(Reg.regions)
+async def get_regions(message: types.Message, state: FSMContext):
+    if message.text in ["⬅️ Назад", "⬅️ Orqaga"]:
+        data = await state.get_data()
+        lang = data.get("lang", "ru")
+        if data.get("yatt") and ("Да" in data["yatt"] or "Ha" in data["yatt"]):
+            text = "Отправьте фото или PDF-файл свидетельства о регистрации ИП:" if lang == "ru" else "YaTT ro‘yxatdan o‘tganligi to‘g‘risidagi guvohnoma fotosini yoki PDF faylini yuboring:"
+            await message.answer(text, reply_markup=back_kb(lang))
+            await state.set_state(Reg.yatt_doc)
+        else:
+            text = "Есть ли у вас ИП?" if lang == "ru" else "YaTT bormi?"
+            await message.answer(text, reply_markup=yatt_kb(lang))
+            await state.set_state(Reg.yatt)
         return
 
     data = await state.get_data()
@@ -432,9 +471,13 @@ async def confirm_reg(message: types.Message, state: FSMContext):
             ("truck_photo_back", "Техпаспорт задняя"),
             ("license_photo_front", "Права лицевая"),
             ("license_photo_back", "Права задняя"),
+            ("yatt_doc", "Свидетельство ИП"),
         ]:
             if data.get(key):
-                await bot.send_photo(ADMIN_ID, data[key], caption=caption)
+                if key == "yatt_doc" and not str(data[key]).startswith("AgAC"):  # грубая проверка на фото
+                    await bot.send_document(ADMIN_ID, data[key], caption=caption)
+                else:
+                    await bot.send_photo(ADMIN_ID, data[key], caption=caption)
     except Exception as e:
         logger.error(f"Не удалось отправить уведомление: {e}")
     
@@ -460,7 +503,7 @@ async def help_cmd(message: types.Message, state: FSMContext):
             "3. Выберите тип кузова и укажите грузоподъёмность\n"
             "4. Отправьте фото техпаспорта (лицевая и задняя)\n"
             "5. Отправьте фото прав (лицевая и задняя)\n"
-            "6. Укажите наличие ИП\n"
+            "6. Укажите наличие ИП и отправьте свидетельство (фото или PDF)\n"
             "7. Выберите регионы работы\n"
             "8. Подтвердите данные\n\n"
             "После регистрации откроется доступ к грузам.\n"
@@ -474,7 +517,7 @@ async def help_cmd(message: types.Message, state: FSMContext):
             "3. Kuzov turini tanlang va yuk ko‘tarish qobiliyatini yozing\n"
             "4. Texpasport fotosini yuboring (old va orqa)\n"
             "5. Guvohnoma fotosini yuboring (old va orqa)\n"
-            "6. YaTT borligini ko‘rsating\n"
+            "6. YaTT borligini ko‘rsating va guvohnomani yuboring\n"
             "7. Ish hududlarini tanlang\n"
             "8. Ma’lumotlarni tasdiqlang\n\n"
             "Ro‘yxatdan o‘tgach yuklarga kirish ochiladi.\n"
