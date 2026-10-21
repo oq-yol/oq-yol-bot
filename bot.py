@@ -17,6 +17,7 @@ from google.oauth2.service_account import Credentials
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 841472578
+CHANNEL_ID = -1004467870125
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 
 logging.basicConfig(level=logging.INFO)
@@ -25,7 +26,6 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Google Sheets
 def get_sheet():
     try:
         creds_json = os.getenv("GOOGLE_CREDENTIALS")
@@ -129,7 +129,6 @@ def regions_kb(lang="ru"):
     return kb.as_markup(resize_keyboard=True)
 
 def save_driver(data: dict):
-    # CSV backup
     file_exists = os.path.isfile("drivers.csv")
     with open("drivers.csv", "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=data.keys())
@@ -137,7 +136,6 @@ def save_driver(data: dict):
             writer.writeheader()
         writer.writerow(data)
 
-    # Google Sheets
     try:
         sheet = get_sheet()
         if sheet:
@@ -509,18 +507,24 @@ async def confirm_reg(message: types.Message, state: FSMContext):
             f"Username: @{data.get('username', '')}"
         )
         await bot.send_message(ADMIN_ID, text_admin)
-        for key, caption in [
+        await bot.send_message(CHANNEL_ID, text_admin)
+
+        docs = [
             ("truck_photo_front", "Техпаспорт лицевая"),
             ("truck_photo_back", "Техпаспорт задняя"),
             ("license_photo_front", "Права лицевая"),
             ("license_photo_back", "Права задняя"),
             ("yatt_doc", "Свидетельство ИП"),
-        ]:
+        ]
+        for key, caption in docs:
             if data.get(key):
+                full_caption = f"{data.get('name')} | {data.get('phone')}\n{caption}"
                 if key == "yatt_doc" and not str(data[key]).startswith("AgAC"):
-                    await bot.send_document(ADMIN_ID, data[key], caption=caption)
+                    await bot.send_document(CHANNEL_ID, data[key], caption=full_caption)
+                    await bot.send_document(ADMIN_ID, data[key], caption=full_caption)
                 else:
-                    await bot.send_photo(ADMIN_ID, data[key], caption=caption)
+                    await bot.send_photo(CHANNEL_ID, data[key], caption=full_caption)
+                    await bot.send_photo(ADMIN_ID, data[key], caption=full_caption)
     except Exception as e:
         logger.error(f"Не удалось отправить уведомление: {e}")
     
