@@ -84,12 +84,20 @@ def back_kb(lang="ru"):
     kb.button(text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga")
     return kb.as_markup(resize_keyboard=True)
 
+TRUCK_TYPES_RU = [
+    "Тент", "Рефрижератор", "Бортовой",
+    "Площадка без бортов", "Контейнеровоз",
+    "Одиночка 60 куб.м.", "Паровоз 120 куб.м."
+]
+
+TRUCK_TYPES_UZ = [
+    "Tent", "Refrijerator", "Bortli",
+    "Bortsiz maydoncha", "Konteyner tashuvchi",
+    "Yolg‘iz 60 kub.m.", "Parovoz 120 kub.m."
+]
+
 def truck_type_kb(lang="ru"):
-    types = [
-        "Тент", "Рефрижератор", "Бортовой",
-        "Площадка без бортов", "Контейнеровоз",
-        "Одиночка 60 куб.м.", "Паровоз 120 куб.м."
-    ]
+    types = TRUCK_TYPES_RU if lang == "ru" else TRUCK_TYPES_UZ
     kb = ReplyKeyboardBuilder()
     for t in types:
         kb.button(text=t)
@@ -111,19 +119,27 @@ def yatt_kb(lang="ru"):
     kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
 
-REGIONS = [
+REGIONS_RU = [
     "Андижанская область", "Бухарская область", "Джизакская область",
     "Кашкадарьинская область", "Навоийская область", "Наманганская область",
     "Самаркандская область", "Сурхандарьинская область", "Сырдарьинская область",
     "Ташкентская область", "Ферганская область", "Хорезмская область"
 ]
 
+REGIONS_UZ = [
+    "Andijon viloyati", "Buxoro viloyati", "Jizzax viloyati",
+    "Qashqadaryo viloyati", "Navoiy viloyati", "Namangan viloyati",
+    "Samarqand viloyati", "Surxondaryo viloyati", "Sirdaryo viloyati",
+    "Toshkent viloyati", "Farg‘ona viloyati", "Xorazm viloyati"
+]
+
 def regions_kb(lang="ru"):
+    regions = REGIONS_RU if lang == "ru" else REGIONS_UZ
     kb = ReplyKeyboardBuilder()
-    kb.button(text="✅ Все регионы")
-    for r in REGIONS:
+    kb.button(text="✅ Все регионы" if lang == "ru" else "✅ Barcha hududlar")
+    for r in regions:
         kb.button(text=r)
-    kb.button(text="✅ Готово")
+    kb.button(text="✅ Готово" if lang == "ru" else "✅ Tayyor")
     kb.button(text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga")
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
@@ -174,7 +190,7 @@ async def start(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "Assalomu alaykum! / Здравствуйте!\n\n"
-        "OQ YOL — Yuk mashinalari mashinalar uchun butun O'zbekiston boylab doimiy yuklar.\n"
+        "OQ YOL — Yuk mashinalari uchun butun O‘zbekiston bo‘ylab doimiy yuklar.\n"
         "Постоянные грузы для большегрузных машин по всему Узбекистану.\n\n"
         "Выберите язык / Tilni tanlang:",
         reply_markup=lang_kb()
@@ -234,12 +250,16 @@ async def get_truck_type(message: types.Message, state: FSMContext):
         await message.answer(text, reply_markup=back_kb(lang))
         await state.set_state(Reg.phone)
         return
-    if message.text not in ["Тент", "Рефрижератор", "Бортовой", "Площадка без бортов", "Контейнеровоз", "Одиночка 60 куб.м.", "Паровоз 120 куб.м."]:
-        await message.answer("Выберите тип из списка.")
-        return
-    await state.update_data(truck_type=message.text)
+
     data = await state.get_data()
     lang = data.get("lang", "ru")
+    valid_types = TRUCK_TYPES_RU if lang == "ru" else TRUCK_TYPES_UZ
+
+    if message.text not in valid_types:
+        await message.answer("Выберите тип из списка." if lang == "ru" else "Ro‘yxatdan tur tanlang.")
+        return
+
+    await state.update_data(truck_type=message.text)
     text = "Укажите грузоподъёмность в тоннах (например: 20):" if lang == "ru" else "Yuk ko‘tarish qobiliyatini tonnada yozing (masalan: 20):"
     await message.answer(text, reply_markup=back_kb(lang))
     await state.set_state(Reg.capacity)
@@ -270,7 +290,7 @@ async def get_truck_photo_front(message: types.Message, state: FSMContext):
         await state.set_state(Reg.capacity)
         return
     if not message.photo:
-        await message.answer("Пожалуйста, отправьте фото.")
+        await message.answer("Пожалуйста, отправьте фото." if (await state.get_data()).get("lang") == "ru" else "Iltimos, foto yuboring.")
         return
     await state.update_data(truck_photo_front=message.photo[-1].file_id)
     data = await state.get_data()
@@ -289,7 +309,7 @@ async def get_truck_photo_back(message: types.Message, state: FSMContext):
         await state.set_state(Reg.truck_photo_front)
         return
     if not message.photo:
-        await message.answer("Пожалуйста, отправьте фото.")
+        await message.answer("Пожалуйста, отправьте фото." if (await state.get_data()).get("lang") == "ru" else "Iltimos, foto yuboring.")
         return
     await state.update_data(truck_photo_back=message.photo[-1].file_id)
     data = await state.get_data()
@@ -308,7 +328,7 @@ async def get_license_photo_front(message: types.Message, state: FSMContext):
         await state.set_state(Reg.truck_photo_back)
         return
     if not message.photo:
-        await message.answer("Пожалуйста, отправьте фото.")
+        await message.answer("Пожалуйста, отправьте фото." if (await state.get_data()).get("lang") == "ru" else "Iltimos, foto yuboring.")
         return
     await state.update_data(license_photo_front=message.photo[-1].file_id)
     data = await state.get_data()
@@ -327,7 +347,7 @@ async def get_license_photo_back(message: types.Message, state: FSMContext):
         await state.set_state(Reg.license_photo_front)
         return
     if not message.photo:
-        await message.answer("Пожалуйста, отправьте фото.")
+        await message.answer("Пожалуйста, отправьте фото." if (await state.get_data()).get("lang") == "ru" else "Iltimos, foto yuboring.")
         return
     await state.update_data(license_photo_back=message.photo[-1].file_id)
     data = await state.get_data()
@@ -404,7 +424,7 @@ async def get_yatt_doc(message: types.Message, state: FSMContext):
         file_id = message.document.file_id
 
     if not file_id:
-        await message.answer("Пожалуйста, отправьте фото или PDF-файл свидетельства.")
+        await message.answer("Пожалуйста, отправьте фото или PDF-файл свидетельства." if (await state.get_data()).get("lang") == "ru" else "Iltimos, foto yoki PDF fayl yuboring.")
         return
 
     await state.update_data(yatt_doc=file_id, selected_regions=[])
@@ -432,30 +452,35 @@ async def get_regions(message: types.Message, state: FSMContext):
     data = await state.get_data()
     selected = data.get("selected_regions", [])
     lang = data.get("lang", "ru")
+    regions_list = REGIONS_RU if lang == "ru" else REGIONS_UZ
+    all_regions_btn = "✅ Все регионы" if lang == "ru" else "✅ Barcha hududlar"
+    done_btn = "✅ Готово" if lang == "ru" else "✅ Tayyor"
 
-    if message.text == "✅ Готово":
+    if message.text == done_btn:
         if not selected:
-            await message.answer("Выберите хотя бы один регион.")
+            await message.answer("Выберите хотя бы один регион." if lang == "ru" else "Kamida bitta hudud tanlang.")
             return
         await state.update_data(regions=", ".join(selected))
         await show_summary(message, state)
         return
 
-    if message.text == "✅ Все регионы":
-        selected = REGIONS.copy()
+    if message.text == all_regions_btn:
+        selected = regions_list.copy()
         await state.update_data(selected_regions=selected)
-        await message.answer("Выбраны все регионы.\nНажмите «✅ Готово» для продолжения.")
+        msg = "Выбраны все регионы.\nНажмите «✅ Готово» для продолжения." if lang == "ru" else "Barcha hududlar tanlandi.\nDavom etish uchun «✅ Tayyor» tugmasini bosing."
+        await message.answer(msg)
         return
 
-    if message.text in REGIONS:
+    if message.text in regions_list:
         if message.text not in selected:
             selected.append(message.text)
             await state.update_data(selected_regions=selected)
-            await message.answer(f"Добавлено: {message.text}\nВыбрано: {', '.join(selected)}")
+            added = f"Добавлено: {message.text}\nВыбрано: {', '.join(selected)}" if lang == "ru" else f"Qo‘shildi: {message.text}\nTanlangan: {', '.join(selected)}"
+            await message.answer(added)
         else:
-            await message.answer("Этот регион уже выбран.")
+            await message.answer("Этот регион уже выбран." if lang == "ru" else "Bu hudud allaqachon tanlangan.")
     else:
-        await message.answer("Выберите регион из списка, «✅ Все регионы» или «✅ Готово».")
+        await message.answer("Выберите регион из списка, «✅ Все регионы» или «✅ Готово»." if lang == "ru" else "Ro‘yxatdan hudud tanlang, «✅ Barcha hududlar» yoki «✅ Tayyor».")
 
 async def show_summary(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -538,9 +563,9 @@ async def confirm_reg(message: types.Message, state: FSMContext):
 async def show_loads(message: types.Message, state: FSMContext):
     data = await state.get_data()
     if not data.get("registered"):
-        await message.answer("Сначала завершите регистрацию.")
+        await message.answer("Сначала завершите регистрацию." if data.get("lang") == "ru" else "Avval ro‘yxatdan o‘ting.")
         return
-    await message.answer("Актуальные грузы публикуются в канале:\n@OQYOL_Gruz\n\nПодписывайтесь!")
+    await message.answer("Актуальные грузы публикуются в канале:\n@OQYOL_Gruz\n\nПодписывайтесь!" if data.get("lang") == "ru" else "Joriy yuklar kanalda joylanadi:\n@OQYOL_Gruz\n\nObuna bo‘ling!")
 
 @dp.message(F.text.in_(["❓ Помощь", "❓ Yordam"]))
 async def help_cmd(message: types.Message, state: FSMContext):
