@@ -174,7 +174,7 @@ async def start(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "Assalomu alaykum! / Здравствуйте!\n\n"
-        "OQ YOL — doimiy yuklar tent mashinalar uchun.\n"
+        "OQ YOL — Yuk mashinalari mashinalar uchun butun O'zbekiston boylab doimiy yuklar.\n"
         "Постоянные грузы для большегрузных машин по всему Узбекистану.\n\n"
         "Выберите язык / Tilni tanlang:",
         reply_markup=lang_kb()
@@ -367,7 +367,7 @@ async def get_yatt(message: types.Message, state: FSMContext):
                 "5. Подпишите заявление ЭЦП и оплатите госпошлину (онлайн дешевле).\n"
                 "6. Получите подтверждение (обычно до 30 минут).\n\n"
                 "После этого можно продолжить регистрацию в боте.\n\n"
-                "Если возникнут трудности с открытием ИП — напишите мне лично: @ваш_username"
+                "Если возникнут трудности с открытием ИП — напишите мне лично: @umarov_k"
             )
         else:
             guide = (
@@ -379,7 +379,7 @@ async def get_yatt(message: types.Message, state: FSMContext):
                 "5. ERI bilan imzolang va boj to‘lang (onlayn arzonroq).\n"
                 "6. Tasdiq oling (odatda 30 daqiqagacha).\n\n"
                 "Keyin botda ro‘yxatdan o‘tishni davom ettiring.\n\n"
-                "Agar qiyinchiliklar bo‘lsa — menga yozing: @ваш_username"
+                "Agar qiyinchiliklar bo‘lsa — menga yozing: @umarov_k"
             )
         await message.answer(guide)
 
